@@ -9,6 +9,28 @@ export interface FoodItem {
   storageLocation: StorageLocation;
   imageUrl?: string;
   notes?: string;
+  barcode?: string;
+  brand?: string;
+  nutritionalInfo?: NutritionalInfo;
+}
+
+export interface NutritionalInfo {
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
+  sugar?: number;
+}
+
+export interface BarcodeProduct {
+  barcode: string;
+  name: string;
+  brand?: string;
+  category?: FoodCategory;
+  imageUrl?: string;
+  nutritionalInfo?: NutritionalInfo;
+  commonUnits?: string[];
 }
 
 export interface Recipe {
@@ -41,6 +63,8 @@ export interface DonationItem {
   donationDate: Date;
   charity?: Charity;
   status: DonationStatus;
+  pickupScheduled?: Date;
+  notes?: string;
 }
 
 export interface Charity {
@@ -52,6 +76,23 @@ export interface Charity {
   description: string;
   acceptedItems: FoodCategory[];
   pickupAvailable: boolean;
+  operatingHours?: OperatingHours;
+  coordinates?: {
+    lat: number;
+    lng: number;
+  };
+  distance?: number;
+  website?: string;
+}
+
+export interface OperatingHours {
+  monday?: string;
+  tuesday?: string;
+  wednesday?: string;
+  thursday?: string;
+  friday?: string;
+  saturday?: string;
+  sunday?: string;
 }
 
 export interface User {
@@ -60,18 +101,25 @@ export interface User {
   email: string;
   userType: 'individual' | 'business';
   preferences: UserPreferences;
+  location?: {
+    lat: number;
+    lng: number;
+    address?: string;
+  };
 }
 
 export interface UserPreferences {
   dietaryRestrictions: string[];
   cuisinePreferences: string[];
   alertSettings: AlertSettings;
+  defaultUnits: Record<FoodCategory, string>;
 }
 
 export interface AlertSettings {
   expirationDays: number;
   enableEmailAlerts: boolean;
   enablePushNotifications: boolean;
+  donationReminders: boolean;
 }
 
 export type FoodCategory = 
@@ -97,6 +145,7 @@ export interface WasteReport {
   wasteByCategory: Record<FoodCategory, number>;
   estimatedCostWasted: number;
   wasteReductionTrend: number;
+  topWastedItems: string[];
 }
 
 export interface CostSavings {
@@ -104,4 +153,15 @@ export interface CostSavings {
   savingsThisMonth: number;
   wasteReduced: number;
   recipesUsed: number;
+  donationValue: number;
+}
+
+export interface ConsumptionRecord {
+  id: string;
+  foodItemId: string;
+  quantityConsumed: number;
+  consumptionDate: Date;
+  method: 'recipe' | 'direct' | 'donation';
+  recipeId?: string;
+  donationId?: string;
 }
