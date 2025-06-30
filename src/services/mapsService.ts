@@ -24,12 +24,12 @@ export class MapsService {
           });
         },
         (error) => {
-          console.error('Error getting location:', error);
+          console.warn('Error getting location:', error);
           resolve(null);
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 30000,
           maximumAge: 300000, // 5 minutes
         }
       );
