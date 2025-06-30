@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Camera, X, Loader2, Search } from 'lucide-react';
+import { Camera, X, Loader2, Search, Zap } from 'lucide-react';
 import { BarcodeService } from '../../services/barcodeService';
 import { BarcodeProduct } from '../../types';
 
@@ -16,6 +16,7 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
   const [error, setError] = useState<string | null>(null);
   const [manualBarcode, setManualBarcode] = useState('');
   const [isLookingUp, setIsLookingUp] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -30,17 +31,40 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
   const startCamera = async () => {
     try {
       setError(null);
+      setHasPermission(null);
+      
+      // Check if camera is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError('Camera not supported on this device. Please use manual entry.');
+        setHasPermission(false);
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
       });
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setIsScanning(true);
+        setHasPermission(true);
       }
-    } catch (err) {
-      setError('Camera access denied. Please allow camera permissions or enter barcode manually.');
-      console.error('Camera error:', err);
+    } catch (err: any) {
+      setHasPermission(false);
+      if (err.name === 'NotAllowedError') {
+        setError('Camera access denied. Please allow camera permissions and try again, or use manual entry.');
+      } else if (err.name === 'NotFoundError') {
+        setError('No camera found on this device. Please use manual entry.');
+      } else if (err.name === 'NotSupportedError') {
+        setError('Camera not supported on this device. Please use manual entry.');
+      } else {
+        setError('Unable to access camera. Please try manual entry.');
+      }
+      console.warn('Camera error:', err);
     }
   };
 
@@ -63,7 +87,7 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
         onProductFound(product);
         onClose();
       } else {
-        setError('Product not found. Please try manual entry.');
+        setError('Product not found in database. Please try manual entry.');
       }
     } catch (err) {
       setError('Error looking up product. Please try again.');
@@ -89,15 +113,21 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
     }
   };
 
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleManualLookup();
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-md w-full overflow-hidden">
-        <div className="flex justify-between items-center p-4 border-b border-gray-200">
+        <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-primary-50">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-            <Camera className="h-5 w-5 mr-2" />
-            Scan Barcode
+            <Camera className="h-5 w-5 mr-2 text-primary-600" />
+            Scan Product Barcode
           </h2>
           <button
             onClick={onClose}
@@ -108,13 +138,19 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
         </div>
 
         <div className="p-4">
-          {error ? (
+          {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <p className="text-red-600 text-sm">{error}</p>
             </div>
-          ) : null}
+          )}
 
-          {isScanning && !error ? (
+          {hasPermission === null && !error && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-blue-600 text-sm">Requesting camera access...</p>
+            </div>
+          )}
+
+          {isScanning && hasPermission && !error ? (
             <div className="relative mb-4">
               <video
                 ref={videoRef}
@@ -123,45 +159,54 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
                 className="w-full h-48 bg-gray-900 rounded-lg object-cover"
               />
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="border-2 border-primary-500 w-48 h-24 rounded-lg"></div>
+                <div className="border-2 border-primary-500 w-48 h-24 rounded-lg bg-transparent"></div>
+              </div>
+              <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                Position barcode in frame
               </div>
               <p className="text-center text-sm text-gray-600 mt-2">
-                Position barcode within the frame
+                Align the barcode within the highlighted area
               </p>
             </div>
           ) : null}
 
           {/* Demo buttons for testing */}
           <div className="mb-4">
-            <p className="text-sm text-gray-600 mb-2">Demo: Try these sample barcodes:</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-gray-700">Quick Demo:</p>
+              <div className="flex items-center text-xs text-gray-500">
+                <Zap className="h-3 w-3 mr-1" />
+                Try sample products
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => simulateScan('0123456789012')}
                 disabled={isLookingUp}
-                className="bg-blue-50 text-blue-600 px-3 py-2 rounded text-xs hover:bg-blue-100 transition-colors"
+                className="bg-blue-50 text-blue-600 px-3 py-2 rounded text-xs hover:bg-blue-100 transition-colors disabled:opacity-50 flex items-center justify-center"
               >
-                Milk
+                🥛 Organic Milk
               </button>
               <button
                 onClick={() => simulateScan('0987654321098')}
                 disabled={isLookingUp}
-                className="bg-blue-50 text-blue-600 px-3 py-2 rounded text-xs hover:bg-blue-100 transition-colors"
+                className="bg-yellow-50 text-yellow-600 px-3 py-2 rounded text-xs hover:bg-yellow-100 transition-colors disabled:opacity-50 flex items-center justify-center"
               >
-                Bananas
+                🍌 Fresh Bananas
               </button>
               <button
                 onClick={() => simulateScan('1234567890123')}
                 disabled={isLookingUp}
-                className="bg-blue-50 text-blue-600 px-3 py-2 rounded text-xs hover:bg-blue-100 transition-colors"
+                className="bg-red-50 text-red-600 px-3 py-2 rounded text-xs hover:bg-red-100 transition-colors disabled:opacity-50 flex items-center justify-center"
               >
-                Tomatoes
+                🍅 Organic Tomatoes
               </button>
               <button
                 onClick={() => simulateScan('5432109876543')}
                 disabled={isLookingUp}
-                className="bg-blue-50 text-blue-600 px-3 py-2 rounded text-xs hover:bg-blue-100 transition-colors"
+                className="bg-orange-50 text-orange-600 px-3 py-2 rounded text-xs hover:bg-orange-100 transition-colors disabled:opacity-50 flex items-center justify-center"
               >
-                Chicken
+                🍗 Chicken Breast
               </button>
             </div>
           </div>
@@ -176,8 +221,9 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
                   type="text"
                   value={manualBarcode}
                   onChange={(e) => setManualBarcode(e.target.value)}
-                  placeholder="Enter barcode number"
-                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  onKeyPress={handleKeyPress}
+                  placeholder="Enter barcode number (e.g., 1234567890123)"
+                  className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
                 />
                 <button
                   onClick={handleManualLookup}
@@ -191,6 +237,9 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
                   )}
                 </button>
               </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Barcode should be 8-13 digits long
+              </p>
             </div>
 
             <div className="flex space-x-3">
@@ -208,6 +257,13 @@ export default function BarcodeScanner({ isOpen, onClose, onProductFound, onManu
               </button>
             </div>
           </div>
+
+          {isLookingUp && (
+            <div className="mt-4 flex items-center justify-center text-primary-600">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              <span className="text-sm">Looking up product...</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
